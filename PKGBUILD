@@ -2,14 +2,14 @@
 # Contributors: OttoA (AUR), hoschi (AUR), samlt (AUR), andreyv (AUR)
 
 pkgname=ioquake3-git
-pkgver=20180304.gd28e667e
+pkgver=20250819.gb297c596
 pkgrel=1
 pkgdesc="The de-facto OSS Quake 3 distribution. You need the retail/demo .pk3 files to play."
 url="http://ioquake3.org/"
-license=('GPL')
+license=('GPL-2.0-only')
 arch=('i686' 'x86_64' 'aarch64')
 depends=('curl' 'freetype2' 'libjpeg' 'libvorbis' 'openal' 'opus' 'opusfile' 'sdl2' 'zlib')
-makedepends=('git')
+makedepends=('git' 'cmake')
 optdepends=('mumble: Mumble VoIP support')
 conflicts=('quake3' 'quake3-icculus-svn' 'quake3-svn' 'ioquake3-svn')
 provides=('quake3' 'ioquake3')
@@ -18,10 +18,10 @@ install=quake3.install
 source=('quake3.desktop' 'quake3.png'
 'http://ftp.gwdg.de/pub/misc/ftp.idsoftware.com/idstuff/quake3/linux/linuxq3apoint-1.32b-3.x86.run'
 'quake3::git+https://github.com/ioquake/ioq3.git')
-sha256sums=('12dbd31e9de1493642d120bfd1548dfc4935e47fec806003cfc04b9d84b85673'
-            '1ce9af6ee0055896c5e4ba07ccaa05da0809ea8d97f7b5ed9f7dda9127c6a8f7'
-            'c36132c5556b35e01950f1e9c646235033a5130f87ad776ba2bc7becf4f4f186'
-            'SKIP')
+b2sums=('0b8618375af8f47654660577f9cb4d4ca88ba4c8dedf42fd96c9e0b030cfcf8a03a66f8923c5584d5e3ba61682c727fa6a2a174f530f7388bd5c44a337b91d3a'
+        'dac1ebad61fd1eec809fcc397fda9cbb9effed9e646d37435e6b3b23249f8dd9f09488e1323cf307da22786be618464ffd087d1aff100b2c09d9cdecbbd5de14'
+        '79585534d930a466af58cd34acaac7b9d95da2ad665525b7f7d9ad2e05f3efe5f94b7958b5adca8dd8f687b37d82323a76a701af4bd2cf6011df1e4cc59f4ca9'
+        'SKIP')
 
 pkgver() {
     cd "${srcdir}/quake3"
@@ -32,42 +32,41 @@ pkgver() {
 prepare() {
     cd "${srcdir}"
 
-    # Extract Patch Files
+    # Make latest quake3 patch executable
     chmod +x "${srcdir}/linuxq3apoint-1.32b-3.x86.run"
+
+    # Extract Patch Files
     "${srcdir}/linuxq3apoint-1.32b-3.x86.run" --tar xf
-}
-
-q3make() {
-    export CFLAGS+=" ${CPPFLAGS}"
-
-    make $@ \
-        BUILD_CLIENT=1                \
-        BUILD_SERVER=1                \
-        BUILD_BASEGAME=0              \
-        BUILD_MISSIONPACK=0           \
-        BUILD_GAME_SO=0               \
-        BUILD_GAME_QVM=0              \
-        BUILD_RENDERER_OPENGL2=1      \
-        DEFAULT_BASEDIR="/opt/quake3" \
-        FULLBINEXT=''                 \
-        GENERATE_DEPENDENCIES=0       \
-        OPTIMIZE=''                   \
-        USE_OPENAL=1                  \
-        USE_OPENAL_DLOPEN=0           \
-        USE_CURL=1                    \
-        USE_CURL_DLOPEN=0             \
-        USE_CODEC_VORBIS=1            \
-        USE_CODEC_OPUS=1              \
-        USE_FREETYPE=1                \
-        USE_MUMBLE=1                  \
-        USE_VOIP=1                    \
-        USE_INTERNAL_LIBS=0
 }
 
 build() {
     cd "${srcdir}/quake3"
 
-    q3make
+    # Configure
+    cmake -S . -B build -DCMAKE_BUILD_TYPE=Release \
+        -DBUILD_SERVER=ON           \
+        -DBUILD_CLIENT=ON           \
+        -DBUILD_RENDERER_GL1=ON     \
+        -DBUILD_RENDERER_GL2=ON     \
+        -DBUILD_GAME_LIBRARIES=OFF  \
+        -DBUILD_GAME_QVMS=OFF       \
+        -DBUILD_STANDALONE=OFF      \
+        -DUSE_ARCHLESS_FILENAMES=ON \
+        -DUSE_RENDERER_DLOPEN=ON    \
+        -DUSE_OPENAL=ON             \
+        -DUSE_OPENAL_DLOPEN=OFF     \
+        -DUSE_HTTP=ON               \
+        -DUSE_CODEC_VORBIS=ON       \
+        -DUSE_CODEC_OPUS=ON         \
+        -DUSE_VOIP=ON               \
+        -DUSE_MUMBLE=ON             \
+        -DUSE_FREETYPE=ON           \
+        -DUSE_INTERNAL_LIBS=OFF     \
+        -DCMAKE_INSTALL_PREFIX=/opt/quake3 \
+        -DCMAKE_C_FLAGS_RELEASE="${CFLAGS}"
+
+    # Build
+    cmake --build build
 }
 
 package() {
@@ -76,8 +75,8 @@ package() {
     # Create Destination Directories
     install -d "${pkgdir}"/{usr/bin,/opt/quake3/{baseq3,missionpack,demoq3}}
 
-    # Install Files
-    q3make COPYDIR="${pkgdir}/opt/quake3" copyfiles
+    # Install Compiled Files
+    cmake --install build --prefix "${pkgdir}/opt/quake3"
 
     # Install Quake 3 Patch Files
     install -m 644 "${srcdir}"/baseq3/*.pk3 \
@@ -91,7 +90,9 @@ package() {
     ln -sf /opt/quake3/baseq3/pak{1..8}.pk3 "${pkgdir}/opt/quake3/demoq3/"
 
     # Link Executables in /usr/bin
+    ln -sf "/opt/quake3/ioquake3" "${pkgdir}/usr/bin/ioquake3"
     ln -sf "/opt/quake3/ioquake3" "${pkgdir}/usr/bin/quake3"
+    ln -sf "/opt/quake3/ioq3ded" "${pkgdir}/usr/bin/ioq3ded"
     ln -sf "/opt/quake3/ioq3ded" "${pkgdir}/usr/bin/q3ded"
 
     # Install systemd service file
@@ -99,7 +100,7 @@ package() {
         "${pkgdir}/usr/lib/systemd/system/q3a.service"
 
     # Patch systemd service file
-    sed -i -e "s@/usr/local/games/quake3/ioq3ded.x86_64@/opt/quake3/q3ded@" \
+    sed -i -e "s@/usr/local/games/quake3/ioq3ded.x86_64@/opt/quake3/ioq3ded@" \
         "${pkgdir}/usr/lib/systemd/system/q3a.service"
 
     # Install Desktop File
@@ -110,4 +111,3 @@ package() {
     install -D -m 644 "${srcdir}/quake3.png" \
         "${pkgdir}/usr/share/pixmaps/quake3.png"
 }
-

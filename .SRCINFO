@@ -1,14 +1,15 @@
 pkgbase = ioquake3-git
 	pkgdesc = The de-facto OSS Quake 3 distribution. You need the retail/demo .pk3 files to play.
-	pkgver = 20180304.gd28e667e
+	pkgver = 20250819.gb297c596
 	pkgrel = 1
 	url = http://ioquake3.org/
 	install = quake3.install
 	arch = i686
 	arch = x86_64
 	arch = aarch64
-	license = GPL
+	license = GPL-2.0-only
 	makedepends = git
+	makedepends = cmake
 	depends = curl
 	depends = freetype2
 	depends = libjpeg
